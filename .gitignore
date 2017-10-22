@@ -1,0 +1,8 @@
+node_modules
+*.log
+*.map
+/lib
+coverage
+/*.js
+*.flow
+dist
