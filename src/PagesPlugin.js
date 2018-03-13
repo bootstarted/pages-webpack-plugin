@@ -3,21 +3,22 @@ import cheerio from 'cheerio';
 import loaderUtils from 'loader-utils';
 
 type RenderResult = {
-  markup: string
-}
-
-type RenderFunction = (props: Object) => (RenderResult | Promise<RenderResult>);
-
-type Options = {
-  name: string,
-  mapStatsToProps: (stats: Object) => Object,
-  render: RenderFunction,
-  paths: Array<string>,
-}
+  markup: string,
+};
 
 type OutputResult = {
   markup: string,
   path: string,
+};
+
+type RenderFunction = (props: Object) => RenderResult | Promise<RenderResult>;
+
+type Options = {
+  name: string,
+  mapStatsToProps: (stats: Object) => Object,
+  mapResults: (Array<OutputResult>) => Array<OutputResult>,
+  render: RenderFunction,
+  paths: Array<string>,
 };
 
 type DoItOptions = {
@@ -26,11 +27,7 @@ type DoItOptions = {
   paths: Array<string>,
 };
 
-const doIt = ({
-  render,
-  props,
-  paths = ['/'],
-}: DoItOptions) => {
+const doIt = ({render, props, paths = ['/']}: DoItOptions) => {
   const pathMap = {};
   const renderPaths = (
     results: Array<OutputResult>,
@@ -41,29 +38,31 @@ const doIt = ({
     }
     const next = [];
     const newResults = results.slice();
-    return paths.reduce((previous: Promise<*>, path: string) => {
-      if (pathMap[path]) {
-        return previous;
-      }
-      pathMap[path] = true;
-      return previous.then(() => {
-        const result: Promise<RenderResult> = (
-          Promise.resolve(render({path, ...props}))
-        );
-        return result.then(({markup}) => {
-          // TODO: ^ Check `statusCode`, `redirect` ?? etc. and not generate
-          // pages that have e.g. 404 or 500 errors.
-          newResults.push({markup, path});
-          const $ = cheerio.load(markup);
-          $('a[href^="/"]').each((i, elem) => {
-            const path = $(elem).attr('href');
-            next.push(path);
+    return paths
+      .reduce((previous: Promise<*>, path: string) => {
+        if (pathMap[path]) {
+          return previous;
+        }
+        pathMap[path] = true;
+        return previous.then(() => {
+          const result: Promise<RenderResult> = Promise.resolve(
+            render({path, ...props})
+          );
+          return result.then((data) => {
+            // TODO: ^ Check `statusCode`, `redirect` ?? etc. and not generate
+            // pages that have e.g. 404 or 500 errors.
+            newResults.push({path, ...data});
+            const $ = cheerio.load(data.markup);
+            $('a[href^="/"]').each((i, elem) => {
+              const path = $(elem).attr('href');
+              next.push(path);
+            });
           });
         });
+      }, Promise.resolve())
+      .then(() => {
+        return renderPaths(newResults, next);
       });
-    }, Promise.resolve()).then(() => {
-      return renderPaths(newResults, next);
-    });
   };
   return renderPaths([], paths);
 };
@@ -76,11 +75,9 @@ class PagesPlugin {
   }
 
   getName(resourcePath: string, options: Object) {
-    return loaderUtils.interpolateName(
-      {resourcePath},
-      this.options.name,
-      options
-    ).replace(/^\.\//, '');
+    return loaderUtils
+      .interpolateName({resourcePath}, this.options.name, options)
+      .replace(/^\.\//, '');
   }
 
   normalizePath(path: string) {
@@ -100,22 +97,31 @@ class PagesPlugin {
         render,
         props: mapStatsToProps(stats),
         paths: paths,
-      }).then((results) => {
-        results.forEach((result) => {
-          const path = this.getName(this.normalizePath(result.path), {
-            content: result.markup,
+      })
+        .then((preResults) => {
+          preResults.forEach((result) => {
+            const path = this.getName(this.normalizePath(result.path), {
+              content: result.markup,
+            });
+            result.path = path;
           });
-          compilation.assets[path] = {
-            source: function() {
-              return result.markup;
-            },
-            size: function() {
-              return result.markup.length;
-            },
-          };
-        });
-        callback();
-      }).catch(callback);
+          const results =
+            typeof this.options.mapResults === 'undefined'
+              ? preResults
+              : this.options.mapResults(preResults);
+          results.forEach((result) => {
+            compilation.assets[result.path] = {
+              source: function() {
+                return result.markup;
+              },
+              size: function() {
+                return result.markup.length;
+              },
+            };
+          });
+          callback();
+        })
+        .catch(callback);
     });
   }
 }
