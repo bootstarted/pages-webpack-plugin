@@ -56,7 +56,8 @@ class PagesPlugin<T: RenderResult, P: Object> {
       useDirectory:
         typeof useDirectory === 'boolean'
           ? (() => useDirectory)
-          : (() => true),
+          : useDirectory || ((result) => path.extname(result.path) === ''),
+      mapResults: (results) => results,
       ...options,
     };
 
