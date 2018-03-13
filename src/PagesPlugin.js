@@ -10,10 +10,6 @@ type RenderResult = {
   status?: number,
 };
 
-type RenderProps = {
-  path: string,
-};
-
 type OutputResult<T: RenderResult> = {
   ...T,
   markup: string,
@@ -21,27 +17,36 @@ type OutputResult<T: RenderResult> = {
   filename: string,
 };
 
-type RequiredOptions<T: RenderResult, P: RenderProps> = {|
-  mapStatsToProps: (stats: Object) => P,
-  render: (props: P) => T | Promise<T>,
-|};
-
-type Options<T: RenderResult, P: RenderProps> = {
-  ...RequiredOptions<T, P>,
-  name: string,
-  paths: Array<string>,
-  directory: boolean | ((OutputResult<T>) => boolean),
-  mapResults: (Array<OutputResult<T>>) => Array<OutputResult<T>>,
+type Stats = {
+  assets: Array<{
+    name: string,
+    chunkNames: Array<string>,
+  }>,
+  hash: string,
+  publicPath: string,
 };
 
-class PagesPlugin<T: RenderResult, P: RenderProps> {
+type RequiredOptions<T: RenderResult, P: Object> = {
+  mapStatsToProps: (stats: Stats) => P,
+  render(props: {...P, path: string}): Promise<T> | T,
+};
+
+type Options<T: RenderResult, P: Object> = {
+  ...$Exact<RequiredOptions<T, P>>,
+  name: string,
+  paths: Array<string>,
+  useDirectory: boolean | ((result: OutputResult<T>) => boolean),
+  mapResults(results: Array<OutputResult<T>>): Array<OutputResult<T>>,
+};
+
+class PagesPlugin<T: RenderResult, P: Object> {
   options: Options<T, P>;
 
   constructor(options: RequiredOptions<T, P>) {
     this.options = {
       name: '[path][name].[ext]',
       paths: ['/'],
-      directory: (result) => path.extname(result.path) === '',
+      useDirectory: (result) => path.extname(result.path) === '',
       mapResults: (results) => results,
       ...options,
     };
@@ -66,10 +71,10 @@ class PagesPlugin<T: RenderResult, P: RenderProps> {
   }
 
   getUseDirectory(result: OutputResult<T>): boolean {
-    if (typeof this.options.directory === 'boolean') {
-      return this.options.directory;
-    } else if (typeof this.options.directory === 'function') {
-      return this.options.directory(result);
+    if (typeof this.options.useDirectory === 'boolean') {
+      return this.options.useDirectory;
+    } else if (typeof this.options.useDirectory === 'function') {
+      return this.options.useDirectory(result);
     }
     return true;
   }
@@ -90,7 +95,7 @@ class PagesPlugin<T: RenderResult, P: RenderProps> {
 
   parsePathsFromMarkup(markup: string): Array<string> {
     const $ = cheerio.load(markup);
-    const relativeLinks = $('a[href^="/"], a[href^="."]');
+    const relativeLinks = $('a[href^="/"]');
 
     const paths = [];
 
