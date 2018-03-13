@@ -15,10 +15,11 @@ type RenderFunction = (props: Object) => RenderResult | Promise<RenderResult>;
 
 type Options = {
   name: string,
+  directory?: ((OutputResult) => boolean) | boolean,
   mapStatsToProps: (stats: Object) => Object,
-  mapResults: (Array<OutputResult>) => Array<OutputResult>,
+  mapResults?: (Array<OutputResult>) => Array<OutputResult>,
   render: RenderFunction,
-  paths: Array<string>,
+  paths?: Array<string>,
 };
 
 type DoItOptions = {
@@ -67,11 +68,29 @@ const doIt = ({render, props, paths = ['/']}: DoItOptions) => {
   return renderPaths([], paths);
 };
 
+const defaultOptions: Options = {
+  name: '[path][name].[ext]',
+  paths: ['/'],
+  mapStatsToProps: () => {
+    throw new TypeError();
+  },
+  render: () => {
+    throw new TypeError();
+  },
+  directory: (result: OutputResult): boolean => {
+    const parts = result.path.split('/');
+    return parts[parts.length - 1].indexOf('.') < 0;
+  },
+};
+
 class PagesPlugin {
   options: Options;
 
   constructor(options: Options) {
-    this.options = options;
+    this.options = {
+      ...defaultOptions,
+      ...options,
+    };
   }
 
   getName(resourcePath: string, options: Object) {
@@ -80,13 +99,23 @@ class PagesPlugin {
       .replace(/^\.\//, '');
   }
 
-  normalizePath(path: string) {
-    if (path.charAt(0) !== '/') {
+  getUseDirectory(result: OutputResult): boolean {
+    if (typeof this.options.directory === 'boolean') {
+      return this.options.directory;
+    } else if (typeof this.options.directory === 'function') {
+      return this.options.directory(result);
+    }
+    return true;
+  }
+
+  normalizePath(result: OutputResult) {
+    if (result.path.charAt(0) !== '/') {
       throw new TypeError();
     }
-    return `${path.substr(1)}/index.html`
-      .replace(/^\//, './')
-      .replace(/\/\//g, '/');
+    const path = this.getUseDirectory(result)
+      ? `${result.path.substr(1)}/index.html`
+      : result.path.substr(1);
+    return path.replace(/^\//, './').replace(/\/\//g, '/');
   }
 
   apply(compiler: any) {
@@ -96,11 +125,11 @@ class PagesPlugin {
       doIt({
         render,
         props: mapStatsToProps(stats),
-        paths: paths,
+        paths: paths || ['/'],
       })
         .then((preResults) => {
           preResults.forEach((result) => {
-            const path = this.getName(this.normalizePath(result.path), {
+            const path = this.getName(this.normalizePath(result), {
               content: result.markup,
             });
             result.path = path;
