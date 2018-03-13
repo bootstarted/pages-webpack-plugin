@@ -22,13 +22,13 @@ type Options = {
   paths?: Array<string>,
 };
 
-type DoItOptions = {
+type RenderPagesOptions = {
   render: RenderFunction,
   props: Object,
   paths: Array<string>,
 };
 
-const doIt = ({render, props, paths = ['/']}: DoItOptions) => {
+const renderPages = ({render, props, paths = ['/']}: RenderPagesOptions) => {
   const pathMap = {};
   const renderPaths = (
     results: Array<OutputResult>,
@@ -122,7 +122,7 @@ class PagesPlugin {
     const {mapStatsToProps, render, paths} = this.options;
     compiler.plugin('emit', (compilation, callback) => {
       const stats = compilation.getStats().toJson();
-      doIt({
+      renderPages({
         render,
         props: mapStatsToProps(stats),
         paths: paths || ['/'],
