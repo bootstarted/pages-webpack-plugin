@@ -29,14 +29,14 @@ type Stats = {
 type RequiredOptions<T: RenderResult, P: Object> = {
   mapStatsToProps: (stats: Stats) => P,
   render(props: {...P, path: string}): Promise<T> | T,
+  useDirectory: boolean | ((result: OutputResult<T>) => boolean),
+  mapResults(results: Array<OutputResult<T>>): Array<OutputResult<T>>,
 };
 
 type Options<T: RenderResult, P: Object> = {
   ...$Exact<RequiredOptions<T, P>>,
   name: string,
   paths: Array<string>,
-  useDirectory: boolean | ((result: OutputResult<T>) => boolean),
-  mapResults(results: Array<OutputResult<T>>): Array<OutputResult<T>>,
 };
 
 class PagesPlugin<T: RenderResult, P: Object> {
@@ -46,8 +46,6 @@ class PagesPlugin<T: RenderResult, P: Object> {
     this.options = {
       name: '[path][name].[ext]',
       paths: ['/'],
-      useDirectory: (result) => path.extname(result.path) === '',
-      mapResults: (results) => results,
       ...options,
     };
 
