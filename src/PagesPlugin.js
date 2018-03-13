@@ -72,10 +72,10 @@ const defaultOptions: Options = {
   name: '[path][name].[ext]',
   paths: ['/'],
   mapStatsToProps: () => {
-    throw new TypeError();
+    throw new TypeError('Must pass valid `mapStatsToProps` option.');
   },
   render: () => {
-    throw new TypeError();
+    throw new TypeError('Must pass valid `render` option.');
   },
   directory: (result: OutputResult): boolean => {
     const parts = result.path.split('/');
