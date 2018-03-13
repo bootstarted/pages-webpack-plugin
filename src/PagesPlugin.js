@@ -3,6 +3,7 @@
 import cheerio from 'cheerio';
 import loaderUtils from 'loader-utils';
 import path from 'path';
+import url from 'url';
 
 type RenderResult = {
   markup: string,
@@ -27,13 +28,11 @@ type Stats = {
 };
 
 type Render<T, P> = ({...P, path: string}) => Promise<T> | T;
-type UseDirectory<T> = ((OutputResult<T>) => boolean);
 type MapResults<T> = (Array<OutputResult<T>>) => Array<OutputResult<T>>;
 
 type Options<T: RenderResult, P: Object> = {
   mapStatsToProps: (stats: Stats) => P,
   render: Render<T, P>,
-  useDirectory?: boolean | UseDirectory<T>,
   mapResults?: MapResults<T>,
   name?: string,
   paths?: Array<string>,
@@ -43,20 +42,15 @@ class PagesPlugin<T: RenderResult, P: Object> {
   options: {
     mapStatsToProps: (stats: Stats) => P,
     render: Render<T, P>,
-    useDirectory: UseDirectory<T>,
     mapResults: MapResults<T>,
     name: string,
     paths: Array<string>,
   };
 
-  constructor({useDirectory, ...options}: Options<T, P>) {
+  constructor(options: Options<T, P>) {
     this.options = {
       name: '[path][name].[ext]',
       paths: ['/'],
-      useDirectory:
-        typeof useDirectory === 'boolean'
-          ? (() => useDirectory)
-          : useDirectory || ((result) => path.extname(result.path) === ''),
       mapResults: (results) => results,
       ...options,
     };
@@ -74,37 +68,74 @@ class PagesPlugin<T: RenderResult, P: Object> {
     }
   }
 
-  getFilename(resourcePath: string, options: Object) {
-    return loaderUtils
-      .interpolateName({resourcePath}, this.options.name, options)
-      .replace(/^\.\//, '');
-  }
+  normalizePath(pathname: string) {
+    const parts = path.parse(pathname);
+    const {name, dir, ext} = parts;
 
-  normalizePath(result: OutputResult<T>) {
-    if (result.path.charAt(0) !== '/') {
-      throw new TypeError(
-        `PagesPlugin encountered invalid path: ${result.path}`,
-      );
+    if (ext && name) {
+      return pathname;
     }
 
-    const path = this.options.useDirectory(result)
-      ? `${result.path.substr(1)}/index.html`
-      : result.path.substr(1);
+    return path.join(dir, name, 'index.html');
+  }
 
-    return path.replace(/^\//, './').replace(/\/\//g, '/');
+  getFilename(result: OutputResult<T>) {
+    const resourcePath = `.${this.normalizePath(result.path)}`;
+    const content = result.markup;
+
+    return loaderUtils
+      .interpolateName({resourcePath}, this.options.name, {content})
+      .replace(/^\.\//, '');
   }
 
   parsePathsFromMarkup(markup: string): Array<string> {
     const $ = cheerio.load(markup);
-    const relativeLinks = $('a[href^="/"]');
+    const links = $('a[href]');
 
     const paths = [];
 
-    relativeLinks.each((i, element) => {
-      paths.push($(element).attr('href'));
+    links.each((i, element) => {
+      const href = $(element).attr('href');
+      const {pathname, host} = url.parse(href);
+
+      if (
+        !paths.includes(pathname) &&
+        pathname &&
+        !host &&
+        !/\/\//.test(href)
+      ) {
+        paths.push(path.join(pathname));
+      }
     });
 
     return paths;
+  }
+
+  isValidPath(pathname: string) {
+    return /^\//.test(pathname);
+  }
+
+  resolvePath(currentPath: string, pathname: string) {
+    if (/^\//.test(pathname)) return pathname;
+
+    const dirParts = currentPath.split(/\/+/).slice(1);
+    if (dirParts.length !== 0 && /\./.test(dirParts[dirParts.length - 1])) {
+      dirParts.pop();
+    }
+
+    const pathParts = pathname.split(/\/+/).filter((part) => part !== '.');
+
+    let atRoot = false;
+
+    while (pathParts[0] === '..') {
+      pathParts.shift();
+      atRoot = atRoot || dirParts.length === 0;
+
+      if (atRoot) dirParts.push('..');
+      else dirParts.pop();
+    }
+
+    return `/${path.join(...dirParts, ...pathParts)}`;
   }
 
   renderPages(
@@ -117,19 +148,24 @@ class PagesPlugin<T: RenderResult, P: Object> {
 
     let discoveredPaths = [];
     return paths
-      .reduce((previous, path) => {
-        if (renderedPaths.includes(path)) return previous;
+      .reduce((previous, currentPath) => {
+        const normalizedPath = this.normalizePath(currentPath);
 
-        renderedPaths.push(path);
+        if (renderedPaths.includes(normalizedPath)) return previous;
+
+        renderedPaths.push(normalizedPath);
 
         return previous
-          .then(() => this.options.render({...props, path}))
+          .then(() => this.options.render({...props, path: currentPath}))
           .then((result) => {
             // TODO: ^ Check `statusCode`, `redirect` ?? etc. and not generate
             // pages that have e.g. 404 or 500 errors.
-            results.push({...result, filename: '', path});
+            results.push({...result, filename: '', path: currentPath});
+
             discoveredPaths = discoveredPaths.concat(
               this.parsePathsFromMarkup(result.markup)
+                .map((pathname) => this.resolvePath(currentPath, pathname))
+                .filter((pathname) => this.isValidPath(pathname))
             );
           });
       }, Promise.resolve())
@@ -141,13 +177,15 @@ class PagesPlugin<T: RenderResult, P: Object> {
   handleEmit = (compilation: Object, done: (?Error) => void) => {
     const stats = compilation.getStats().toJson();
 
-    this.renderPages(this.options.mapStatsToProps(stats), this.options.paths)
+    const preparedPaths = this.options.paths
+      .filter((pathname) => !/\.\.\//.test(pathname))
+      .map((pathname) => path.join('/', pathname));
+
+    this.renderPages(this.options.mapStatsToProps(stats), preparedPaths)
       .then((results) =>
         results.map((result) => ({
           ...result,
-          filename: this.getFilename(this.normalizePath(result), {
-            content: result.markup,
-          }),
+          filename: this.getFilename(result),
         })),
       )
       .then(this.options.mapResults)

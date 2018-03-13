@@ -74,35 +74,4 @@ describe('PagesPlugin', () => {
         .to.contain('We have the hugest');
     });
   });
-
-  describe('useDirectory', () => {
-    describe('when `true`', () => {
-      it('should always emit an index file', () => {
-        const config = createConfig(PagesPlugin, {
-          ...baseConfig,
-          useDirectory: true,
-        });
-
-        return execWebpack(config).then((result) => {
-          console.log('result', Object.keys(result));
-          expect(result).to.have.property('sobig/index.html');
-        });
-      });
-    });
-
-    describe('when `false`', () => {
-      it('should only emit an index file when rendering a dir', () => {
-        const config = createConfig(PagesPlugin, {
-          ...baseConfig,
-          useDirectory: false,
-        });
-
-        return execWebpack(config).then((result) => {
-          console.log('result', Object.keys(result));
-          expect(result).to.have.property('index.html');
-          expect(result).to.have.property('products.html');
-        });
-      });
-    });
-  });
 });

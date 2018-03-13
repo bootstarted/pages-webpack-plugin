@@ -28,13 +28,6 @@ _ = new PagesPlugin({
       return result;
     });
   },
-  useDirectory(result) {
-    (result.foo: string);
-    // $ExpectError
-    (result.foo: number);
-
-    return true;
-  },
 });
 
 _ = new PagesPlugin({
@@ -42,7 +35,14 @@ _ = new PagesPlugin({
     return {stats};
   },
   render() {
-    return Promise.resolve({markup: '', redirect: '/', status: 200});
+    return Promise.resolve({markup: '', redirect: '/', foo: 'bar'});
   },
-  useDirectory: false,
+  mapResults(results) {
+    return results.map((result) => {
+      (result.foo: string);
+      // $ExpectError
+      (result.foo: number);
+      return result;
+    });
+  },
 });
