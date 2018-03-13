@@ -26,23 +26,25 @@ type Stats = {
   publicPath: string,
 };
 
-type RequiredOptions<T: RenderResult, P: Object> = {
+type Options<T: RenderResult, P: Object> = {
   mapStatsToProps: (stats: Stats) => P,
   render(props: {...P, path: string}): Promise<T> | T,
-  useDirectory: boolean | ((result: OutputResult<T>) => boolean),
-  mapResults(results: Array<OutputResult<T>>): Array<OutputResult<T>>,
-};
-
-type Options<T: RenderResult, P: Object> = {
-  ...$Exact<RequiredOptions<T, P>>,
-  name: string,
-  paths: Array<string>,
+  useDirectory?: ((result: OutputResult<T>) => boolean),
+  mapResults?: (results: Array<OutputResult<T>>) => Array<OutputResult<T>>,
+  name?: string,
+  paths?: Array<string>,
 };
 
 class PagesPlugin<T: RenderResult, P: Object> {
-  options: Options<T, P>;
+  options: {
+    ...$Exact<Options<T, P>>,
+    name: string,
+    paths: Array<string>,
+    useDirectory: ((result: OutputResult<T>) => boolean),
+    mapResults: (results: Array<OutputResult<T>>) => Array<OutputResult<T>>,
+  };
 
-  constructor(options: RequiredOptions<T, P>) {
+  constructor(options: Options<T, P>) {
     this.options = {
       name: '[path][name].[ext]',
       paths: ['/'],

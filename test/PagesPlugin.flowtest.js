@@ -26,5 +26,4 @@ const _plugin = new PagesPlugin({
       return result;
     });
   },
-  useDirectory: false,
 });
