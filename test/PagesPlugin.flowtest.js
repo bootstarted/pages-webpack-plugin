@@ -2,7 +2,9 @@
 
 import PagesPlugin from '../src/PagesPlugin';
 
-const _plugin = new PagesPlugin({
+let _;
+
+_ = new PagesPlugin({
   mapStatsToProps(stats) {
     return {stats};
   },
@@ -12,7 +14,7 @@ const _plugin = new PagesPlugin({
     // $ExpectError
     (result.path: number);
 
-    return Promise.resolve({markup: '', redirect: '/', status: 200, foo: 'bar'});
+    return {markup: '', redirect: '/', status: 200, foo: 'bar'};
   },
   mapResults(results) {
     (results: Array<Object>);
@@ -26,4 +28,21 @@ const _plugin = new PagesPlugin({
       return result;
     });
   },
+  useDirectory(result) {
+    (result.foo: string);
+    // $ExpectError
+    (result.foo: number);
+
+    return true;
+  },
+});
+
+_ = new PagesPlugin({
+  mapStatsToProps(stats) {
+    return {stats};
+  },
+  render() {
+    return Promise.resolve({markup: '', redirect: '/', status: 200});
+  },
+  useDirectory: false,
 });

@@ -26,28 +26,37 @@ type Stats = {
   publicPath: string,
 };
 
+type Render<T, P> = ({...P, path: string}) => Promise<T> | T;
+type UseDirectory<T> = ((OutputResult<T>) => boolean);
+type MapResults<T> = (Array<OutputResult<T>>) => Array<OutputResult<T>>;
+
 type Options<T: RenderResult, P: Object> = {
   mapStatsToProps: (stats: Stats) => P,
-  render(props: {...P, path: string}): Promise<T> | T,
-  useDirectory?: ((result: OutputResult<T>) => boolean),
-  mapResults?: (results: Array<OutputResult<T>>) => Array<OutputResult<T>>,
+  render: Render<T, P>,
+  useDirectory?: boolean | UseDirectory<T>,
+  mapResults?: MapResults<T>,
   name?: string,
   paths?: Array<string>,
 };
 
 class PagesPlugin<T: RenderResult, P: Object> {
   options: {
-    ...$Exact<Options<T, P>>,
+    mapStatsToProps: (stats: Stats) => P,
+    render: Render<T, P>,
+    useDirectory: UseDirectory<T>,
+    mapResults: MapResults<T>,
     name: string,
     paths: Array<string>,
-    useDirectory: ((result: OutputResult<T>) => boolean),
-    mapResults: (results: Array<OutputResult<T>>) => Array<OutputResult<T>>,
   };
 
-  constructor(options: Options<T, P>) {
+  constructor({useDirectory, ...options}: Options<T, P>) {
     this.options = {
       name: '[path][name].[ext]',
       paths: ['/'],
+      useDirectory:
+        typeof useDirectory === 'boolean'
+          ? (() => useDirectory)
+          : (() => true),
       ...options,
     };
 
@@ -70,15 +79,6 @@ class PagesPlugin<T: RenderResult, P: Object> {
       .replace(/^\.\//, '');
   }
 
-  getUseDirectory(result: OutputResult<T>): boolean {
-    if (typeof this.options.useDirectory === 'boolean') {
-      return this.options.useDirectory;
-    } else if (typeof this.options.useDirectory === 'function') {
-      return this.options.useDirectory(result);
-    }
-    return true;
-  }
-
   normalizePath(result: OutputResult<T>) {
     if (result.path.charAt(0) !== '/') {
       throw new TypeError(
@@ -86,7 +86,7 @@ class PagesPlugin<T: RenderResult, P: Object> {
       );
     }
 
-    const path = this.getUseDirectory(result)
+    const path = this.options.useDirectory(result)
       ? `${result.path.substr(1)}/index.html`
       : result.path.substr(1);
 
