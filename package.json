@@ -26,6 +26,7 @@
     "babel-core": "^6.3.26",
     "babel-plugin-syntax-object-rest-spread": "^6.13.0",
     "babel-plugin-transform-adana": "^0.5.10",
+    "babel-plugin-transform-class-properties": "^6.24.1",
     "babel-plugin-transform-object-rest-spread": "^6.26.0",
     "babel-preset-env": "^1.6.0",
     "babel-preset-flow": "^6.23.0",
@@ -43,7 +44,6 @@
     "webpack": ">=1"
   },
   "dependencies": {
-    "cheerio": "^1.0.0-rc.2",
-    "loader-utils": "^1.1.0"
+    "cheerio": "^1.0.0-rc.2"
   }
 }

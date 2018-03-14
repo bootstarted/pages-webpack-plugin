@@ -28,12 +28,10 @@ module.exports = {
   // ...
   plugins: [
     new PagesPlugin({
-      name: '[path][name].[ext]',
-      paths: [
-        '/',
-      ],
+      // Required Config
       mapStatsToProps: (stats) => {
-        return {stats: stats};
+        // Map webpack stats object to render function props
+        return {stats: stats.toJson(/* webpack toJson options*/)};
       },
       render: (props) => {
         const {stats, path} = props;
@@ -47,7 +45,21 @@ module.exports = {
             </body>
           </html>
         `
-        return {markup};
+
+        const result = {markup, /* status, redirect */}
+        return result;
+      },
+      // Optional Config
+      paths: ['/'], // Define initial seed routes
+      mapResultToFilename(result) {
+        // Map rendered path to output file name
+        return result.path;
+      },
+      mapResults(results, compilation) {
+        // Intercept generated files before emit
+        return results.map((result) => {
+          return result;
+        });
       },
     }),
   ],

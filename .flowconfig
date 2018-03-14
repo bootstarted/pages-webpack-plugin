@@ -2,11 +2,15 @@
 0.67.1
 
 [ignore]
-.*\.flow
-[include]
+.*\.flow$
 
-[libs]
+[include]
 
 [lints]
 
+[libs]
+
 [options]
+emoji=true
+include_warnings=true
+suppress_comment=\\(.\\|\n\\)*\\$ExpectError
