@@ -32,7 +32,7 @@
     "chai": "^3.4.1",
     "eslint": "^4.5.0",
     "eslint-config-metalab": "^7.0.1",
-    "flow-bin": "^0.56.0",
+    "flow-bin": "^0.67.1",
     "mocha": "^2.3.4",
     "ncp": "^2.0.0",
     "renamer": "^0.6.1",
