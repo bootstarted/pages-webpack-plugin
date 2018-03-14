@@ -10,7 +10,7 @@ const renderBody = (path) => {
   case '/':
     return 'See all our <a href="/products">Products</a>.';
   case '/products':
-    return 'We have the hugest products. <a href="/sobig.html">Learn more</a>.';
+    return 'We have the hugest products. <a href="/yuge.html">Learn more</a>.';
   default:
     return 'Page not found.';
   }
@@ -18,9 +18,7 @@ const renderBody = (path) => {
 
 const baseConfig = {
   name: '[path][name].[ext]',
-  paths: [
-    '/',
-  ],
+  paths: ['/'],
   mapStatsToProps: (stats) => {
     return {stats: stats};
   },
@@ -52,10 +50,10 @@ const execWebpack = (config) => {
       const json = stats.toJson();
       const index = {};
       json.assets.forEach((asset) => {
-        index[asset.name] = fs.readFileSync(path.join(
-          config.output.path,
-          asset.name,
-        ), 'utf8');
+        index[asset.name] = fs.readFileSync(
+          path.join(config.output.path, asset.name),
+          'utf8',
+        );
       });
       resolve(index);
     });
@@ -68,9 +66,11 @@ describe('PagesPlugin', () => {
       ...baseConfig,
     });
     return execWebpack(config).then((result) => {
-      expect(result).to.have.property('index.html')
+      expect(result)
+        .to.have.property('index.html')
         .to.contain('See all');
-      expect(result).to.have.property('products/index.html')
+      expect(result)
+        .to.have.property('products/index.html')
         .to.contain('We have the hugest');
     });
   });

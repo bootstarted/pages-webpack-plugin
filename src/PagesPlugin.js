@@ -1,7 +1,6 @@
 // @flow
 
 import cheerio from 'cheerio';
-import loaderUtils from 'loader-utils';
 import path from 'path';
 import url from 'url';
 
@@ -29,6 +28,7 @@ type Stats = {
 
 type Render<T, P> = ({...P, path: string}) => Promise<T> | T;
 type MapResults<T> = (Array<OutputResult<T>>) => Array<OutputResult<T>>;
+type GetFilename<T> = (OutputResult<T>) => string;
 
 type Options<T: RenderResult, P: Object> = {
   mapStatsToProps: (stats: Stats) => P,
@@ -43,6 +43,7 @@ class PagesPlugin<T: RenderResult, P: Object> {
     mapStatsToProps: (stats: Stats) => P,
     render: Render<T, P>,
     mapResults: MapResults<T>,
+    getFilename: GetFilename<T>,
     name: string,
     paths: Array<string>,
   };
@@ -52,6 +53,7 @@ class PagesPlugin<T: RenderResult, P: Object> {
       name: '[path][name].[ext]',
       paths: ['/'],
       mapResults: (results) => results,
+      getFilename: (result) => result.path,
       ...options,
     };
 
@@ -72,20 +74,11 @@ class PagesPlugin<T: RenderResult, P: Object> {
     const parts = path.parse(pathname);
     const {name, dir, ext} = parts;
 
-    if (ext && name) {
+    if (ext) {
       return pathname;
     }
 
     return path.join(dir, name, 'index.html');
-  }
-
-  getFilename(result: OutputResult<T>) {
-    const resourcePath = `.${this.normalizePath(result.path)}`;
-    const content = result.markup;
-
-    return loaderUtils
-      .interpolateName({resourcePath}, this.options.name, {content})
-      .replace(/^\.\//, '');
   }
 
   parsePathsFromMarkup(markup: string): Array<string> {
@@ -165,7 +158,7 @@ class PagesPlugin<T: RenderResult, P: Object> {
             discoveredPaths = discoveredPaths.concat(
               this.parsePathsFromMarkup(result.markup)
                 .map((pathname) => this.resolvePath(currentPath, pathname))
-                .filter((pathname) => this.isValidPath(pathname))
+                .filter((pathname) => this.isValidPath(pathname)),
             );
           });
       }, Promise.resolve())
@@ -175,20 +168,22 @@ class PagesPlugin<T: RenderResult, P: Object> {
   }
 
   handleEmit = (compilation: Object, done: (?Error) => void) => {
+    const {getFilename, mapStatsToProps, mapResults, paths} = this.options;
+
     const stats = compilation.getStats().toJson();
 
-    const preparedPaths = this.options.paths
+    const preparedPaths = paths
       .filter((pathname) => !/\.\.\//.test(pathname))
       .map((pathname) => path.join('/', pathname));
 
-    this.renderPages(this.options.mapStatsToProps(stats), preparedPaths)
+    this.renderPages(mapStatsToProps(stats), preparedPaths)
       .then((results) =>
         results.map((result) => ({
           ...result,
-          filename: this.getFilename(result),
+          filename: this.normalizePath(getFilename(result)).slice(1),
         })),
       )
-      .then(this.options.mapResults)
+      .then(mapResults)
       .then((results) => {
         results.forEach((result) => {
           compilation.assets[result.filename] = {
