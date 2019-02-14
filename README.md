@@ -61,6 +61,8 @@ module.exports = {
           return result;
         });
       },
+      // Only explore the paths provided in the `paths` option
+      // parsePathsFromMarkup: () => []
     }),
   ],
 };
