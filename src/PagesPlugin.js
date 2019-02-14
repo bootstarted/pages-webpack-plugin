@@ -32,6 +32,7 @@ type Options<T: RenderResult, P: Object> = {
   render: Render<T, P>,
   mapResults?: MapResults<T>,
   paths?: Array<string>,
+  parsePathsFromMarkup?: (string) => Array<string>,
 };
 
 class PagesPlugin<T: RenderResult, P: Object> {
@@ -40,6 +41,7 @@ class PagesPlugin<T: RenderResult, P: Object> {
     render: Render<T, P>,
     mapResults: MapResults<T>,
     mapResultToFilename: mapResultToFilename<T>,
+    parsePathsFromMarkup: (string) => Array<string>,
     paths: Array<string>,
   };
 
@@ -48,6 +50,7 @@ class PagesPlugin<T: RenderResult, P: Object> {
       paths: ['/'],
       mapResults: (results, _compilation) => results,
       mapResultToFilename: (result) => result.path,
+      parsePathsFromMarkup: this.defaultParsePathsFromMarkup,
       ...options,
     };
 
@@ -75,7 +78,7 @@ class PagesPlugin<T: RenderResult, P: Object> {
     return path.join(dir, name, 'index.html');
   }
 
-  parsePathsFromMarkup(markup: string): Array<string> {
+  defaultParsePathsFromMarkup(markup: string): Array<string> {
     const $ = cheerio.load(markup);
     const links = $('a[href]');
 
@@ -150,7 +153,7 @@ class PagesPlugin<T: RenderResult, P: Object> {
             results.push({...result, path: currentPath});
 
             discoveredPaths = discoveredPaths.concat(
-              this.parsePathsFromMarkup(result.markup)
+              this.options.parsePathsFromMarkup(result.markup)
                 .map((pathname) => this.resolvePath(currentPath, pathname))
                 .filter((pathname) => this.isValidPath(pathname)),
             );
